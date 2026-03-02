@@ -1,0 +1,296 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --radius: 0.5rem;
+
+    /* Gold tones */
+    --gold: 0.72 0.12 76;
+    --gold-light: 0.88 0.07 78;
+    --gold-dark: 0.55 0.1 70;
+
+    /* Ivory / cream */
+    --ivory: 0.98 0.012 90;
+    --ivory-mid: 0.95 0.018 88;
+    --ivory-dark: 0.90 0.025 85;
+
+    /* Semantic tokens */
+    --background: 0.98 0.012 90;
+    --foreground: 0.22 0.02 55;
+
+    --card: 0.99 0.008 85;
+    --card-foreground: 0.22 0.02 55;
+
+    --popover: 0.99 0.008 85;
+    --popover-foreground: 0.22 0.02 55;
+
+    /* Primary = deep warm charcoal */
+    --primary: 0.22 0.02 55;
+    --primary-foreground: 0.98 0.012 90;
+
+    /* Secondary = soft gold */
+    --secondary: 0.88 0.07 78;
+    --secondary-foreground: 0.22 0.02 55;
+
+    --muted: 0.93 0.02 85;
+    --muted-foreground: 0.50 0.02 60;
+
+    --accent: 0.72 0.12 76;
+    --accent-foreground: 0.98 0.012 90;
+
+    --destructive: 0.577 0.245 27.325;
+    --destructive-foreground: 0.985 0 0;
+
+    --border: 0.88 0.03 80;
+    --input: 0.90 0.025 80;
+    --ring: 0.72 0.12 76;
+
+    --chart-1: 0.72 0.12 76;
+    --chart-2: 0.6 0.118 184.704;
+    --chart-3: 0.398 0.07 227.392;
+    --chart-4: 0.828 0.189 84.429;
+    --chart-5: 0.769 0.188 70.08;
+
+    --sidebar: 0.96 0.015 88;
+    --sidebar-foreground: 0.22 0.02 55;
+    --sidebar-primary: 0.22 0.02 55;
+    --sidebar-primary-foreground: 0.98 0.012 90;
+    --sidebar-accent: 0.88 0.07 78;
+    --sidebar-accent-foreground: 0.22 0.02 55;
+    --sidebar-border: 0.88 0.03 80;
+    --sidebar-ring: 0.72 0.12 76;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Lato', sans-serif;
+    font-weight: 400;
+    line-height: 1.65;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Cormorant Garamond', 'Playfair Display', serif;
+    letter-spacing: 0.01em;
+    line-height: 1.2;
+  }
+}
+
+/* Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;0,700;1,300;1,400;1,600&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Lato:wght@300;400;700&display=swap');
+
+/* Custom utilities */
+@layer utilities {
+  .font-display {
+    font-family: 'Cormorant Garamond', 'Playfair Display', serif;
+  }
+
+  .font-body {
+    font-family: 'Lato', sans-serif;
+  }
+
+  .text-gold {
+    color: oklch(var(--gold));
+  }
+
+  .bg-gold {
+    background-color: oklch(var(--gold));
+  }
+
+  .bg-gold-light {
+    background-color: oklch(var(--gold-light));
+  }
+
+  .border-gold {
+    border-color: oklch(var(--gold));
+  }
+
+  .bg-ivory {
+    background-color: oklch(var(--ivory));
+  }
+
+  .bg-ivory-mid {
+    background-color: oklch(var(--ivory-mid));
+  }
+
+  .bg-ivory-dark {
+    background-color: oklch(var(--ivory-dark));
+  }
+
+  .gold-gradient {
+    background: linear-gradient(
+      135deg,
+      oklch(0.82 0.1 82) 0%,
+      oklch(0.72 0.13 74) 40%,
+      oklch(0.62 0.11 70) 70%,
+      oklch(0.75 0.12 80) 100%
+    );
+  }
+
+  .gold-text-gradient {
+    background: linear-gradient(
+      135deg,
+      oklch(0.82 0.1 82),
+      oklch(0.68 0.13 72),
+      oklch(0.78 0.1 80)
+    );
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .ivory-gradient {
+    background: linear-gradient(
+      180deg,
+      oklch(0.99 0.008 90) 0%,
+      oklch(0.96 0.018 88) 100%
+    );
+  }
+
+  .hero-overlay {
+    background: linear-gradient(
+      to bottom,
+      oklch(0.15 0.02 50 / 0.55) 0%,
+      oklch(0.12 0.015 50 / 0.72) 60%,
+      oklch(0.10 0.01 50 / 0.85) 100%
+    );
+  }
+
+  .card-luxury {
+    background: oklch(var(--card));
+    border: 1px solid oklch(var(--gold-light) / 0.5);
+    box-shadow:
+      0 1px 3px oklch(var(--gold-dark) / 0.08),
+      0 4px 12px oklch(var(--gold-dark) / 0.06),
+      0 0 0 1px oklch(var(--gold-light) / 0.1);
+  }
+
+  .card-luxury:hover {
+    box-shadow:
+      0 4px 16px oklch(var(--gold-dark) / 0.14),
+      0 8px 32px oklch(var(--gold-dark) / 0.1),
+      0 0 0 1px oklch(var(--gold) / 0.25);
+    transform: translateY(-2px);
+  }
+
+  .btn-gold {
+    background: linear-gradient(
+      135deg,
+      oklch(0.78 0.11 80),
+      oklch(0.68 0.13 72)
+    );
+    color: oklch(var(--ivory));
+    border: none;
+    transition: all 0.3s ease;
+  }
+
+  .btn-gold:hover {
+    background: linear-gradient(
+      135deg,
+      oklch(0.72 0.13 74),
+      oklch(0.60 0.12 68)
+    );
+    box-shadow: 0 4px 16px oklch(var(--gold) / 0.4);
+    transform: translateY(-1px);
+  }
+
+  .btn-outline-gold {
+    background: transparent;
+    color: oklch(var(--gold));
+    border: 1.5px solid oklch(var(--gold));
+    transition: all 0.3s ease;
+  }
+
+  .btn-outline-gold:hover {
+    background: oklch(var(--gold) / 0.08);
+    box-shadow: 0 4px 16px oklch(var(--gold) / 0.2);
+  }
+
+  .divider-gold {
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      oklch(var(--gold) / 0.4),
+      oklch(var(--gold) / 0.8),
+      oklch(var(--gold) / 0.4),
+      transparent
+    );
+  }
+
+  .section-title::after {
+    content: '';
+    display: block;
+    width: 60px;
+    height: 2px;
+    background: linear-gradient(90deg, oklch(var(--gold)), oklch(var(--gold-light)));
+    margin: 0.75rem auto 0;
+  }
+
+  .nav-link {
+    position: relative;
+    color: oklch(var(--foreground));
+    text-decoration: none;
+    transition: color 0.2s ease;
+  }
+
+  .nav-link::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 0;
+    width: 0;
+    height: 1px;
+    background: oklch(var(--gold));
+    transition: width 0.3s ease;
+  }
+
+  .nav-link:hover::after,
+  .nav-link.active::after {
+    width: 100%;
+  }
+
+  .nav-link:hover {
+    color: oklch(var(--gold));
+  }
+
+  .scrolled-nav {
+    background: oklch(var(--ivory) / 0.95);
+    backdrop-filter: blur(12px);
+    box-shadow: 0 2px 20px oklch(var(--gold-dark) / 0.1);
+  }
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: oklch(var(--ivory-mid));
+}
+
+::-webkit-scrollbar-thumb {
+  background: oklch(var(--gold-light));
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: oklch(var(--gold));
+}
+
+/* Selection color */
+::selection {
+  background: oklch(var(--gold) / 0.25);
+  color: oklch(var(--foreground));
+}
