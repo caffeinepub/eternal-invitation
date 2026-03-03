@@ -152,19 +152,20 @@ export interface backendInterface {
     _caffeineStorageRefillCashier(refillInformation: _CaffeineStorageRefillInformation | null): Promise<_CaffeineStorageRefillResult>;
     _caffeineStorageUpdateGatewayPrincipals(): Promise<void>;
     _initializeAccessControlWithSecret(userSecret: string): Promise<void>;
+    adminLogin(email: string, passwordHash: string): Promise<string>;
     adminLogout(token: string): Promise<void>;
     adminSignup(email: string, passwordHash: string): Promise<boolean>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
     changeAdminPassword(sessionToken: string, newPasswordHash: string): Promise<void>;
     createCategory(name: string, description: string, displayOrder: bigint, coverImage: string): Promise<Category>;
-    createCategoryWithSession(sessionToken: string, name: string, description: string, displayOrder: bigint, coverImage: string): Promise<Category>;
+    createCategoryWithSession(token: string, name: string, description: string, displayOrder: bigint, coverImage: string): Promise<Category>;
     createDesign(categoryId: bigint, name: string, description: string, price: string, videoUrl: string): Promise<Design>;
-    createDesignWithSession(sessionToken: string, categoryId: bigint, name: string, description: string, price: string, videoUrl: string): Promise<Design>;
+    createDesignWithSession(token: string, categoryId: bigint, name: string, description: string, price: string, videoUrl: string): Promise<Design>;
     createSelection(designId: bigint, designName: string, customerName: string, email: string, phone: string, brideGroomNames: string, eventDate: string, message: string): Promise<CustomerSelection>;
     deleteCategory(id: bigint): Promise<void>;
-    deleteCategoryWithSession(sessionToken: string, id: bigint): Promise<void>;
+    deleteCategoryWithSession(token: string, id: bigint): Promise<void>;
     deleteDesign(id: bigint): Promise<void>;
-    deleteDesignWithSession(sessionToken: string, id: bigint): Promise<void>;
+    deleteDesignWithSession(token: string, id: bigint): Promise<void>;
     getCallerUserProfile(): Promise<UserProfile | null>;
     getCallerUserRole(): Promise<UserRole>;
     getCategory(id: bigint): Promise<Category | null>;
@@ -172,22 +173,22 @@ export interface backendInterface {
     getSiteSettings(): Promise<SiteSettings>;
     getUserProfile(user: Principal): Promise<UserProfile | null>;
     initialize(): Promise<void>;
-    initializeSeedData(sessionToken: string): Promise<void>;
+    initializeSeedData(token: string): Promise<void>;
     isAdminSetup(): Promise<boolean>;
     isCallerAdmin(): Promise<boolean>;
     listCategories(): Promise<Array<Category>>;
     listDesigns(): Promise<Array<Design>>;
     listDesignsByCategory(categoryId: bigint): Promise<Array<Design>>;
     listSelections(): Promise<Array<CustomerSelection>>;
-    listSelectionsWithSession(sessionToken: string): Promise<Array<CustomerSelection>>;
+    listSelectionsWithSession(token: string): Promise<Array<CustomerSelection>>;
     requestAdminOtp(email: string, passwordHash: string): Promise<string>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
     updateCategory(id: bigint, name: string, description: string, displayOrder: bigint, coverImage: string): Promise<void>;
-    updateCategoryWithSession(sessionToken: string, id: bigint, name: string, description: string, displayOrder: bigint, coverImage: string): Promise<void>;
+    updateCategoryWithSession(token: string, id: bigint, name: string, description: string, displayOrder: bigint, coverImage: string): Promise<void>;
     updateDesign(id: bigint, categoryId: bigint, name: string, description: string, price: string, videoUrl: string): Promise<void>;
-    updateDesignWithSession(sessionToken: string, id: bigint, categoryId: bigint, name: string, description: string, price: string, videoUrl: string): Promise<void>;
+    updateDesignWithSession(token: string, id: bigint, categoryId: bigint, name: string, description: string, price: string, videoUrl: string): Promise<void>;
     updateSiteSettings(tagline: string, contactEmail: string, contactPhone: string, whatsappLink: string, facebookLink: string, instagramLink: string, twitterLink: string): Promise<void>;
-    updateSiteSettingsWithSession(sessionToken: string, tagline: string, contactEmail: string, contactPhone: string, whatsappLink: string, facebookLink: string, instagramLink: string, twitterLink: string): Promise<void>;
+    updateSiteSettingsWithSession(token: string, tagline: string, contactEmail: string, contactPhone: string, whatsappLink: string, facebookLink: string, instagramLink: string, twitterLink: string): Promise<void>;
     verifyAdminOtp(email: string, otp: string): Promise<string>;
     verifyAdminSession(token: string): Promise<boolean>;
 }
@@ -289,6 +290,20 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor._initializeAccessControlWithSecret(arg0);
+            return result;
+        }
+    }
+    async adminLogin(arg0: string, arg1: string): Promise<string> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.adminLogin(arg0, arg1);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.adminLogin(arg0, arg1);
             return result;
         }
     }

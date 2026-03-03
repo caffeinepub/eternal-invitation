@@ -48,12 +48,7 @@ export function Navbar() {
           />
           <span
             className="font-display text-xl font-semibold tracking-wide"
-            style={{
-              color:
-                scrolled || !isHome
-                  ? "oklch(var(--foreground))"
-                  : "oklch(var(--ivory))",
-            }}
+            style={{ color: "oklch(var(--foreground))" }}
           >
             Eternal Invitation
           </span>

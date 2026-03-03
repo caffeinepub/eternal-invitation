@@ -424,6 +424,24 @@ export function useAdminSignup() {
   });
 }
 
+export function useAdminLogin() {
+  const { actor } = useActor();
+  return useMutation({
+    mutationFn: async ({
+      email,
+      passwordHash,
+    }: {
+      email: string;
+      passwordHash: string;
+    }): Promise<string> => {
+      if (!actor) throw new Error("Not connected");
+      const token = await actor.adminLogin(email, passwordHash);
+      setAdminSession(token);
+      return token;
+    },
+  });
+}
+
 export function useRequestAdminOtp() {
   const { actor } = useActor();
   return useMutation({

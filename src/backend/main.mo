@@ -1,25 +1,28 @@
-import Map "mo:core/Map";
-import Order "mo:core/Order";
-import Array "mo:core/Array";
-import Iter "mo:core/Iter";
-import Nat "mo:core/Nat";
 import Int "mo:core/Int";
 import Time "mo:core/Time";
-import Runtime "mo:core/Runtime";
-import Migration "migration";
-import Principal "mo:core/Principal";
-import AccessControl "authorization/access-control";
-import MixinAuthorization "authorization/MixinAuthorization";
-import MixinStorage "blob-storage/Mixin";
-import List "mo:core/List";
+import Nat "mo:core/Nat";
 import Text "mo:core/Text";
+import List "mo:core/List";
+import Order "mo:core/Order";
+import Runtime "mo:core/Runtime";
+import Array "mo:core/Array";
+import Principal "mo:core/Principal";
+import Iter "mo:core/Iter";
+import AccessControl "authorization/access-control";
+import MixinStorage "blob-storage/Mixin";
+import MixinAuthorization "authorization/MixinAuthorization";
+import Map "mo:core/Map";
 
-(with migration = Migration.run)
 actor {
   include MixinStorage();
+  let accessControlState = AccessControl.initState();
+  include MixinAuthorization(accessControlState);
 
-  // Persistent types
-  type Category = {
+  public type UserProfile = {
+    name : Text;
+  };
+
+  public type Category = {
     id : Nat;
     name : Text;
     description : Text;
@@ -27,7 +30,7 @@ actor {
     coverImage : Text;
   };
 
-  type Design = {
+  public type Design = {
     id : Nat;
     categoryId : Nat;
     name : Text;
@@ -36,7 +39,7 @@ actor {
     videoUrl : Text;
   };
 
-  type CustomerSelection = {
+  public type CustomerSelection = {
     id : Nat;
     designId : Nat;
     designName : Text;
@@ -49,7 +52,7 @@ actor {
     submittedAt : Int;
   };
 
-  type SiteSettings = {
+  public type SiteSettings = {
     tagline : Text;
     contactEmail : Text;
     contactPhone : Text;
@@ -59,15 +62,22 @@ actor {
     twitterLink : Text;
   };
 
-  public type UserProfile = {
-    name : Text;
+  public type AdminCredentials = {
+    email : Text;
+    passwordHash : Text;
+    otpCode : Text;
+    otpExpiry : Int;
   };
 
-  // In-memory storage
+  public type AdminSession = {
+    token : Text;
+    expiry : Int;
+  };
+
+  let userProfiles = Map.empty<Principal, UserProfile>();
   let categories = Map.empty<Nat, Category>();
   let designs = Map.empty<Nat, Design>();
   let customerSelections = Map.empty<Nat, CustomerSelection>();
-  let userProfiles = Map.empty<Principal, UserProfile>();
 
   var nextCategoryId = 1;
   var nextDesignId = 1;
@@ -83,30 +93,13 @@ actor {
     twitterLink = "";
   };
 
-  // Compare function for sorting categories
+  var adminCredentials : ?AdminCredentials = null;
+  var adminSession : ?AdminSession = null;
+
   func compareCategories(a : Category, b : Category) : { #less; #equal; #greater } {
     Nat.compare(a.displayOrder, b.displayOrder);
   };
 
-  // ************ Admin Authentication Types ************
-  type AdminCredentials = {
-    email : Text;
-    passwordHash : Text;
-    otpCode : Text;
-    otpExpiry : Int;
-  };
-
-  type AdminSession = {
-    token : Text;
-    expiry : Int;
-  };
-
-  var adminCredentials : ?AdminCredentials = null;
-  var adminSession : ?AdminSession = null;
-
-  // ************ Helper Functions ************
-
-  // Generate a 6-digit OTP
   func generateOtp() : Text {
     let otpNumber = Int.abs(Time.now() % 1_000_000);
     let otpText = otpNumber.toText();
@@ -116,14 +109,12 @@ actor {
     Text.fromArray(sliced);
   };
 
-  // Generate session token
   func generateSessionToken(email : Text) : Text {
     let timestamp = Int.abs(Time.now());
-    let random = Int.abs(Time.now() % 999999);
+    let random = Int.abs(Time.now() % 999_999);
     "sess_" # email # "_" # timestamp.toText() # "_" # random.toText();
   };
 
-  // Verify session token (non-async helper)
   func isValidSession(token : Text) : Bool {
     switch (adminSession) {
       case (null) { false };
@@ -133,14 +124,14 @@ actor {
     };
   };
 
-  // ************ Admin Authentication Functions ************
-
   public query func isAdminSetup() : async Bool {
     adminCredentials != null;
   };
 
   public shared ({ caller }) func adminSignup(email : Text, passwordHash : Text) : async Bool {
-    // Anyone can call this, but only works if no admin exists
+    if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
+      Runtime.trap("Unauthorized: Only admins can set up admin credentials");
+    };
     switch (adminCredentials) {
       case (?_) { Runtime.trap("Admin already set up") };
       case (null) {
@@ -155,8 +146,24 @@ actor {
     };
   };
 
+  public shared ({ caller }) func adminLogin(email : Text, passwordHash : Text) : async Text {
+    switch (adminCredentials) {
+      case (null) { Runtime.trap("Admin not set up") };
+      case (?creds) {
+        if (creds.email != email or creds.passwordHash != passwordHash) {
+          Runtime.trap("Invalid credentials");
+        };
+        let sessionToken = generateSessionToken(email);
+        adminSession := ?{
+          token = sessionToken;
+          expiry = Time.now() + (24 * 60 * 60 * 1_000_000_000);
+        };
+        sessionToken;
+      };
+    };
+  };
+
   public shared ({ caller }) func requestAdminOtp(email : Text, passwordHash : Text) : async Text {
-    // Anyone can call this for login purposes
     switch (adminCredentials) {
       case (null) { Runtime.trap("Admin not set up") };
       case (?creds) {
@@ -167,7 +174,7 @@ actor {
         let newCreds = {
           creds with
           otpCode;
-          otpExpiry = Time.now() + (5 * 60 * 1_000_000_000); // 5 minutes
+          otpExpiry = Time.now() + (5 * 60 * 1_000_000_000);
         };
         adminCredentials := ?newCreds;
         otpCode;
@@ -176,7 +183,6 @@ actor {
   };
 
   public shared ({ caller }) func verifyAdminOtp(email : Text, otp : Text) : async Text {
-    // Anyone can call this for login purposes
     switch (adminCredentials) {
       case (null) { Runtime.trap("Admin not set up") };
       case (?creds) {
@@ -189,18 +195,15 @@ actor {
         if (creds.otpCode != otp) {
           Runtime.trap("Invalid OTP");
         };
-
-        // Clear OTP and create session
         adminCredentials := ?{
           creds with
           otpCode = "";
           otpExpiry = 0;
         };
-
         let sessionToken = generateSessionToken(email);
         adminSession := ?{
           token = sessionToken;
-          expiry = Time.now() + (24 * 60 * 60 * 1_000_000_000); // 24 hours
+          expiry = Time.now() + (24 * 60 * 60 * 1_000_000_000);
         };
         sessionToken;
       };
@@ -208,12 +211,10 @@ actor {
   };
 
   public query func verifyAdminSession(token : Text) : async Bool {
-    // Anyone can verify a token they possess
     isValidSession(token);
   };
 
   public shared ({ caller }) func adminLogout(token : Text) : async () {
-    // Anyone can logout their own session
     switch (adminSession) {
       case (null) { Runtime.trap("No active session") };
       case (?session) {
@@ -226,7 +227,6 @@ actor {
   };
 
   public shared ({ caller }) func changeAdminPassword(sessionToken : Text, newPasswordHash : Text) : async () {
-    // Must have valid session to change password
     if (not isValidSession(sessionToken)) {
       Runtime.trap("Unauthorized: Invalid or expired session");
     };
@@ -243,10 +243,8 @@ actor {
     };
   };
 
-  // ************ Session-Based Category CRUD ************
-
-  public shared ({ caller }) func createCategoryWithSession(sessionToken : Text, name : Text, description : Text, displayOrder : Nat, coverImage : Text) : async Category {
-    if (not isValidSession(sessionToken)) {
+  public shared ({ caller }) func createCategoryWithSession(token : Text, name : Text, description : Text, displayOrder : Nat, coverImage : Text) : async Category {
+    if (not isValidSession(token)) {
       Runtime.trap("Unauthorized: Invalid or expired session");
     };
     let category : Category = {
@@ -261,8 +259,8 @@ actor {
     category;
   };
 
-  public shared ({ caller }) func updateCategoryWithSession(sessionToken : Text, id : Nat, name : Text, description : Text, displayOrder : Nat, coverImage : Text) : async () {
-    if (not isValidSession(sessionToken)) {
+  public shared ({ caller }) func updateCategoryWithSession(token : Text, id : Nat, name : Text, description : Text, displayOrder : Nat, coverImage : Text) : async () {
+    if (not isValidSession(token)) {
       Runtime.trap("Unauthorized: Invalid or expired session");
     };
     switch (categories.get(id)) {
@@ -280,8 +278,8 @@ actor {
     };
   };
 
-  public shared ({ caller }) func deleteCategoryWithSession(sessionToken : Text, id : Nat) : async () {
-    if (not isValidSession(sessionToken)) {
+  public shared ({ caller }) func deleteCategoryWithSession(token : Text, id : Nat) : async () {
+    if (not isValidSession(token)) {
       Runtime.trap("Unauthorized: Invalid or expired session");
     };
     if (not categories.containsKey(id)) {
@@ -290,10 +288,8 @@ actor {
     categories.remove(id);
   };
 
-  // ************ Session-Based Design CRUD ************
-
-  public shared ({ caller }) func createDesignWithSession(sessionToken : Text, categoryId : Nat, name : Text, description : Text, price : Text, videoUrl : Text) : async Design {
-    if (not isValidSession(sessionToken)) {
+  public shared ({ caller }) func createDesignWithSession(token : Text, categoryId : Nat, name : Text, description : Text, price : Text, videoUrl : Text) : async Design {
+    if (not isValidSession(token)) {
       Runtime.trap("Unauthorized: Invalid or expired session");
     };
     if (not categories.containsKey(categoryId)) {
@@ -312,8 +308,8 @@ actor {
     design;
   };
 
-  public shared ({ caller }) func updateDesignWithSession(sessionToken : Text, id : Nat, categoryId : Nat, name : Text, description : Text, price : Text, videoUrl : Text) : async () {
-    if (not isValidSession(sessionToken)) {
+  public shared ({ caller }) func updateDesignWithSession(token : Text, id : Nat, categoryId : Nat, name : Text, description : Text, price : Text, videoUrl : Text) : async () {
+    if (not isValidSession(token)) {
       Runtime.trap("Unauthorized: Invalid or expired session");
     };
     switch (designs.get(id)) {
@@ -332,8 +328,8 @@ actor {
     };
   };
 
-  public shared ({ caller }) func deleteDesignWithSession(sessionToken : Text, id : Nat) : async () {
-    if (not isValidSession(sessionToken)) {
+  public shared ({ caller }) func deleteDesignWithSession(token : Text, id : Nat) : async () {
+    if (not isValidSession(token)) {
       Runtime.trap("Unauthorized: Invalid or expired session");
     };
     if (not designs.containsKey(id)) {
@@ -342,19 +338,15 @@ actor {
     designs.remove(id);
   };
 
-  // ************ Session-Based Customer Selections ************
-
-  public shared ({ caller }) func listSelectionsWithSession(sessionToken : Text) : async [CustomerSelection] {
-    if (not isValidSession(sessionToken)) {
+  public shared ({ caller }) func listSelectionsWithSession(token : Text) : async [CustomerSelection] {
+    if (not isValidSession(token)) {
       Runtime.trap("Unauthorized: Invalid or expired session");
     };
     customerSelections.values().toArray();
   };
 
-  // ************ Session-Based Site Settings ************
-
   public shared ({ caller }) func updateSiteSettingsWithSession(
-    sessionToken : Text,
+    token : Text,
     tagline : Text,
     contactEmail : Text,
     contactPhone : Text,
@@ -363,7 +355,7 @@ actor {
     instagramLink : Text,
     twitterLink : Text,
   ) : async () {
-    if (not isValidSession(sessionToken)) {
+    if (not isValidSession(token)) {
       Runtime.trap("Unauthorized: Invalid or expired session");
     };
     siteSettings := {
@@ -377,14 +369,10 @@ actor {
     };
   };
 
-  // ************ Session-Based Initialization ************
-
-  public shared ({ caller }) func initializeSeedData(sessionToken : Text) : async () {
-    if (not isValidSession(sessionToken)) {
+  public shared ({ caller }) func initializeSeedData(token : Text) : async () {
+    if (not isValidSession(token)) {
       Runtime.trap("Unauthorized: Invalid or expired session");
     };
-
-    // Seed categories
     let categoryNamesList = List.fromArray(["Wedding Invitations", "Engagement Invitations", "Birthday Invitations", "Baby Shower Invitations", "Anniversary Invitations", "Corporate Events", "Other Events"]);
     for (name in categoryNamesList.values()) {
       let categoryObj : Category = {
@@ -395,8 +383,6 @@ actor {
         coverImage = "";
       };
       categories.add(nextCategoryId, categoryObj);
-
-      // Seed 2 designs per category
       let design1 : Design = {
         id = nextDesignId;
         categoryId = nextCategoryId;
@@ -407,7 +393,6 @@ actor {
       };
       designs.add(nextDesignId, design1);
       nextDesignId += 1;
-
       let design2 : Design = {
         id = nextDesignId;
         categoryId = nextCategoryId;
@@ -418,15 +403,9 @@ actor {
       };
       designs.add(nextDesignId, design2);
       nextDesignId += 1;
-
       nextCategoryId += 1;
     };
   };
-
-  // ************ User Profile Functions ************
-
-  let accessControlState = AccessControl.initState();
-  include MixinAuthorization(accessControlState);
 
   public query ({ caller }) func getCallerUserProfile() : async ?UserProfile {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
@@ -448,8 +427,6 @@ actor {
     };
     userProfiles.add(caller, profile);
   };
-
-  // ************ Category CRUD ************
 
   public shared ({ caller }) func createCategory(name : Text, description : Text, displayOrder : Nat, coverImage : Text) : async Category {
     if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
@@ -503,8 +480,6 @@ actor {
   public query func listCategories() : async [Category] {
     categories.values().toArray().sort(compareCategories);
   };
-
-  // ************ Design CRUD ************
 
   public shared ({ caller }) func createDesign(categoryId : Nat, name : Text, description : Text, price : Text, videoUrl : Text) : async Design {
     if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
@@ -565,10 +540,16 @@ actor {
   };
 
   public query func listDesignsByCategory(categoryId : Nat) : async [Design] {
-    designs.values().toArray().filter(func(d : Design) : Bool { d.categoryId == categoryId });
+    let filteredDesignsList = List.empty<Design>();
+    designs.values().toArray().forEach(
+      func(d : Design) {
+        if (d.categoryId == categoryId) {
+          filteredDesignsList.add(d);
+        };
+      }
+    );
+    filteredDesignsList.toArray();
   };
-
-  // ************ Customer Selections ************
 
   public shared func createSelection(
     designId : Nat,
@@ -607,8 +588,6 @@ actor {
     customerSelections.values().toArray();
   };
 
-  // ************ Site Settings ************
-
   public query func getSiteSettings() : async SiteSettings {
     siteSettings;
   };
@@ -636,27 +615,20 @@ actor {
     };
   };
 
-  // ************ Initialization ************
-
   public shared ({ caller }) func initialize() : async () {
     if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
       Runtime.trap("Unauthorized: Only admins can initialize");
     };
-
-    // Seed categories
-    let categoryNames = ["Wedding Invitations", "Engagement Invitations", "Birthday Invitations", "Baby Shower Invitations", "Anniversary Invitations", "Corporate Events", "Other Events"];
-
-    for (name in categoryNames.vals()) {
+    let categoryNames = List.fromArray(["Wedding Invitations", "Engagement Invitations", "Birthday Invitations", "Baby Shower Invitations", "Anniversary Invitations", "Corporate Events", "Other Events"]);
+    for (name in categoryNames.values()) {
       let categoryObj : Category = {
         id = nextCategoryId;
-        name = name;
+        name;
         description = "";
         displayOrder = nextCategoryId;
         coverImage = "";
       };
       categories.add(nextCategoryId, categoryObj);
-
-      // Seed 2 designs per category
       let design1 : Design = {
         id = nextDesignId;
         categoryId = nextCategoryId;
@@ -667,7 +639,6 @@ actor {
       };
       designs.add(nextDesignId, design1);
       nextDesignId += 1;
-
       let design2 : Design = {
         id = nextDesignId;
         categoryId = nextCategoryId;
@@ -678,7 +649,6 @@ actor {
       };
       designs.add(nextDesignId, design2);
       nextDesignId += 1;
-
       nextCategoryId += 1;
     };
   };

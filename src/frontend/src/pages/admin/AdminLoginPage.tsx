@@ -1,17 +1,16 @@
 import { useNavigate } from "@tanstack/react-router";
 import { Eye, EyeOff, Loader2, Lock, Mail, ShieldCheck } from "lucide-react";
 import { motion } from "motion/react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
+  useAdminLogin,
   useAdminSignup,
   useIsAdminSetup,
-  useRequestAdminOtp,
-  useVerifyAdminOtp,
 } from "../../hooks/useQueries";
 import { hashPassword } from "../../utils/adminSession";
 
-type Step = "check" | "setup" | "login" | "otp" | "done";
+type Step = "check" | "setup" | "login" | "done";
 
 export function AdminLoginPage() {
   const navigate = useNavigate();
@@ -19,8 +18,7 @@ export function AdminLoginPage() {
   const { data: isSetup, isLoading: checkingSetup } = useIsAdminSetup();
 
   const signupMut = useAdminSignup();
-  const requestOtpMut = useRequestAdminOtp();
-  const verifyOtpMut = useVerifyAdminOtp();
+  const loginMut = useAdminLogin();
 
   const [step, setStep] = useState<Step>("check");
 
@@ -38,13 +36,6 @@ export function AdminLoginPage() {
   const [showLoginPw, setShowLoginPw] = useState(false);
   const [loginError, setLoginError] = useState("");
 
-  // OTP step
-  const [otp, setOtp] = useState("");
-  const [displayedOtp, setDisplayedOtp] = useState("");
-  const [otpError, setOtpError] = useState("");
-  const [countdown, setCountdown] = useState(300); // 5 minutes
-  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
   // Determine step once isSetup is known
   useEffect(() => {
     if (checkingSetup) return;
@@ -52,35 +43,6 @@ export function AdminLoginPage() {
       setStep(isSetup ? "login" : "setup");
     }
   }, [checkingSetup, isSetup, step]);
-
-  // Countdown timer for OTP
-  useEffect(() => {
-    if (step !== "otp") {
-      if (countdownRef.current) clearInterval(countdownRef.current);
-      return;
-    }
-    setCountdown(300);
-    countdownRef.current = setInterval(() => {
-      setCountdown((prev) => {
-        if (prev <= 1) {
-          if (countdownRef.current) clearInterval(countdownRef.current);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-    return () => {
-      if (countdownRef.current) clearInterval(countdownRef.current);
-    };
-  }, [step]);
-
-  function formatCountdown(secs: number) {
-    const m = Math.floor(secs / 60)
-      .toString()
-      .padStart(2, "0");
-    const s = (secs % 60).toString().padStart(2, "0");
-    return `${m}:${s}`;
-  }
 
   async function handleSetup(e: React.FormEvent) {
     e.preventDefault();
@@ -109,14 +71,16 @@ export function AdminLoginPage() {
         setSetupError("Setup failed. Admin may already be registered.");
         return;
       }
-      toast.success("Admin account created! Sending OTP...");
-      // Auto-request OTP after signup
-      const returnedOtp = await requestOtpMut.mutateAsync({
+      toast.success("Admin account created! Signing you in...");
+      // Auto-login after signup
+      await loginMut.mutateAsync({
         email: setupEmail.trim().toLowerCase(),
         passwordHash: hash,
       });
-      setDisplayedOtp(returnedOtp);
-      setStep("otp");
+      setStep("done");
+      setTimeout(() => {
+        void navigate({ to: "/admin" });
+      }, 1200);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Setup failed";
       setSetupError(msg);
@@ -138,62 +102,29 @@ export function AdminLoginPage() {
 
     try {
       const hash = await hashPassword(loginPassword);
-      const returnedOtp = await requestOtpMut.mutateAsync({
+      await loginMut.mutateAsync({
         email: loginEmail.trim().toLowerCase(),
         passwordHash: hash,
       });
-      setDisplayedOtp(returnedOtp);
-      setStep("otp");
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Login failed";
-      if (
-        msg.includes("Invalid") ||
-        msg.includes("wrong") ||
-        msg.includes("not found")
-      ) {
-        setLoginError("Incorrect email or password. Please try again.");
-      } else {
-        setLoginError(msg);
-      }
-    }
-  }
-
-  async function handleVerifyOtp(e: React.FormEvent) {
-    e.preventDefault();
-    setOtpError("");
-
-    if (otp.trim().length < 6) {
-      setOtpError("Please enter the 6-digit OTP code.");
-      return;
-    }
-
-    try {
-      const email = (setupEmail || loginEmail).trim().toLowerCase();
-      await verifyOtpMut.mutateAsync({ email, otp: otp.trim() });
       toast.success("Access granted! Welcome to your dashboard.");
       setStep("done");
       setTimeout(() => {
         void navigate({ to: "/admin" });
       }, 1200);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Verification failed";
+      const msg = err instanceof Error ? err.message : "Login failed";
       if (
-        msg.includes("expired") ||
         msg.includes("Invalid") ||
-        msg.includes("wrong")
+        msg.includes("wrong") ||
+        msg.includes("not found") ||
+        msg.includes("incorrect") ||
+        msg.includes("Unauthorized")
       ) {
-        setOtpError("Invalid or expired OTP. Please request a new one.");
+        setLoginError("Incorrect email or password. Please try again.");
       } else {
-        setOtpError(msg);
+        setLoginError(msg);
       }
     }
-  }
-
-  function handleResendOtp() {
-    setOtp("");
-    setOtpError("");
-    setDisplayedOtp("");
-    setStep(isSetup ? "login" : "setup");
   }
 
   const isLoading = checkingSetup || step === "check";
@@ -296,6 +227,7 @@ export function AdminLoginPage() {
                       placeholder="your@email.com"
                       autoComplete="email"
                       required
+                      data-ocid="admin.setup.email_input"
                       className="w-full bg-ivory/5 border border-gold/20 rounded-sm pl-10 pr-4 py-3 font-body text-sm text-ivory placeholder:text-ivory/20 focus:outline-none focus:border-gold/50 transition"
                     />
                   </div>
@@ -325,6 +257,7 @@ export function AdminLoginPage() {
                       placeholder="Minimum 8 characters"
                       autoComplete="new-password"
                       required
+                      data-ocid="admin.setup.password_input"
                       className="w-full bg-ivory/5 border border-gold/20 rounded-sm pl-10 pr-12 py-3 font-body text-sm text-ivory placeholder:text-ivory/20 focus:outline-none focus:border-gold/50 transition"
                     />
                     <button
@@ -364,6 +297,7 @@ export function AdminLoginPage() {
                       placeholder="Repeat your password"
                       autoComplete="new-password"
                       required
+                      data-ocid="admin.setup.confirm_input"
                       className="w-full bg-ivory/5 border border-gold/20 rounded-sm pl-10 pr-12 py-3 font-body text-sm text-ivory placeholder:text-ivory/20 focus:outline-none focus:border-gold/50 transition"
                     />
                     <button
@@ -394,10 +328,11 @@ export function AdminLoginPage() {
 
                 <button
                   type="submit"
-                  disabled={signupMut.isPending || requestOtpMut.isPending}
+                  disabled={signupMut.isPending || loginMut.isPending}
+                  data-ocid="admin.setup.submit_button"
                   className="btn-gold w-full flex items-center justify-center gap-2 px-8 py-4 rounded-sm font-body text-sm tracking-widest uppercase font-medium disabled:opacity-50 mt-2"
                 >
-                  {signupMut.isPending || requestOtpMut.isPending ? (
+                  {signupMut.isPending || loginMut.isPending ? (
                     <>
                       <Loader2 size={15} className="animate-spin" />
                       Creating Account...
@@ -429,7 +364,7 @@ export function AdminLoginPage() {
                     Admin Sign In
                   </h2>
                   <p className="font-body text-xs text-ivory/40">
-                    Enter your credentials to receive an OTP
+                    Enter your email and password
                   </p>
                 </div>
               </div>
@@ -459,6 +394,7 @@ export function AdminLoginPage() {
                       placeholder="your@email.com"
                       autoComplete="email"
                       required
+                      data-ocid="admin.login.email_input"
                       className="w-full bg-ivory/5 border border-gold/20 rounded-sm pl-10 pr-4 py-3 font-body text-sm text-ivory placeholder:text-ivory/20 focus:outline-none focus:border-gold/50 transition"
                     />
                   </div>
@@ -488,6 +424,7 @@ export function AdminLoginPage() {
                       placeholder="Your admin password"
                       autoComplete="current-password"
                       required
+                      data-ocid="admin.login.password_input"
                       className="w-full bg-ivory/5 border border-gold/20 rounded-sm pl-10 pr-12 py-3 font-body text-sm text-ivory placeholder:text-ivory/20 focus:outline-none focus:border-gold/50 transition"
                     />
                     <button
@@ -514,136 +451,21 @@ export function AdminLoginPage() {
 
                 <button
                   type="submit"
-                  disabled={requestOtpMut.isPending}
+                  disabled={loginMut.isPending}
+                  data-ocid="admin.login.submit_button"
                   className="btn-gold w-full flex items-center justify-center gap-2 px-8 py-4 rounded-sm font-body text-sm tracking-widest uppercase font-medium disabled:opacity-50 mt-2"
                 >
-                  {requestOtpMut.isPending ? (
+                  {loginMut.isPending ? (
                     <>
                       <Loader2 size={15} className="animate-spin" />
-                      Sending OTP...
+                      Signing In...
                     </>
                   ) : (
                     <>
-                      <Mail size={15} />
-                      Request OTP
+                      <Lock size={15} />
+                      Sign In
                     </>
                   )}
-                </button>
-              </form>
-            </motion.div>
-          )}
-
-          {/* OTP step */}
-          {step === "otp" && (
-            <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.4 }}
-            >
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 rounded-sm bg-gold/10 border border-gold/20 flex items-center justify-center">
-                  <ShieldCheck size={18} className="text-gold" />
-                </div>
-                <div>
-                  <h2 className="font-display text-lg text-ivory">
-                    Verify Identity
-                  </h2>
-                  <p className="font-body text-xs text-ivory/40">
-                    Enter your one-time passcode
-                  </p>
-                </div>
-              </div>
-
-              {/* OTP display box */}
-              {displayedOtp && (
-                <div
-                  className="mb-5 p-4 rounded-sm"
-                  style={{
-                    background: "oklch(var(--gold) / 0.08)",
-                    border: "1px solid oklch(var(--gold) / 0.3)",
-                  }}
-                >
-                  <p className="font-body text-xs text-ivory/50 mb-2 leading-relaxed">
-                    Your one-time code (in production, this arrives by email):
-                  </p>
-                  <div className="flex items-center justify-center">
-                    <span className="font-mono text-3xl font-bold text-gold tracking-[0.4em] select-all">
-                      {displayedOtp}
-                    </span>
-                  </div>
-                </div>
-              )}
-
-              {/* Countdown */}
-              <div className="flex items-center justify-between mb-4">
-                <p className="font-body text-xs text-ivory/40">
-                  Code expires in
-                </p>
-                <span
-                  className={`font-mono text-sm font-medium ${countdown < 60 ? "text-destructive" : "text-gold"}`}
-                >
-                  {formatCountdown(countdown)}
-                </span>
-              </div>
-
-              <form onSubmit={handleVerifyOtp} className="space-y-4">
-                <div>
-                  <label
-                    htmlFor="otp-input"
-                    className="font-body text-xs text-ivory/50 tracking-widest uppercase block mb-2"
-                  >
-                    6-Digit OTP Code
-                  </label>
-                  <input
-                    id="otp-input"
-                    type="text"
-                    inputMode="numeric"
-                    value={otp}
-                    onChange={(e) => {
-                      const val = e.target.value.replace(/\D/g, "").slice(0, 6);
-                      setOtp(val);
-                      setOtpError("");
-                    }}
-                    placeholder="000000"
-                    maxLength={6}
-                    autoComplete="one-time-code"
-                    className="w-full bg-ivory/5 border border-gold/20 rounded-sm px-4 py-3 font-mono text-2xl text-ivory text-center tracking-[0.5em] placeholder:text-ivory/20 placeholder:tracking-normal focus:outline-none focus:border-gold/50 transition"
-                  />
-                </div>
-
-                {/* Error */}
-                {otpError && (
-                  <div className="p-3 rounded-sm bg-destructive/20 border border-destructive/30">
-                    <p className="font-body text-xs text-destructive leading-relaxed">
-                      {otpError}
-                    </p>
-                  </div>
-                )}
-
-                <button
-                  type="submit"
-                  disabled={verifyOtpMut.isPending || otp.length < 6}
-                  className="btn-gold w-full flex items-center justify-center gap-2 px-8 py-4 rounded-sm font-body text-sm tracking-widest uppercase font-medium disabled:opacity-50"
-                >
-                  {verifyOtpMut.isPending ? (
-                    <>
-                      <Loader2 size={15} className="animate-spin" />
-                      Verifying...
-                    </>
-                  ) : (
-                    <>
-                      <ShieldCheck size={15} />
-                      Verify OTP
-                    </>
-                  )}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleResendOtp}
-                  className="w-full text-center font-body text-xs text-ivory/30 hover:text-gold/60 transition py-1 underline underline-offset-2"
-                >
-                  Resend OTP / Go back
                 </button>
               </form>
             </motion.div>
