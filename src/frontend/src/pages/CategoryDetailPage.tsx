@@ -2,6 +2,7 @@ import { Link, useParams } from "@tanstack/react-router";
 import { ArrowLeft, Play, Tag } from "lucide-react";
 import { type Variants, motion } from "motion/react";
 import { useGetCategory, useListDesignsByCategory } from "../hooks/useQueries";
+import { getShowPrice } from "../utils/designShowPrice";
 
 export function CategoryDetailPage() {
   const { categoryId } = useParams({ from: "/categories/$categoryId" });
@@ -125,9 +126,9 @@ export function CategoryDetailPage() {
                     {/* Video / Preview */}
                     <div className="relative bg-foreground/5 overflow-hidden">
                       {design.videoUrl ? (
-                        <div className="relative aspect-video">
-                          {design.videoUrl.includes("youtube.com") ||
-                          design.videoUrl.includes("youtu.be") ? (
+                        design.videoUrl.includes("youtube.com") ||
+                        design.videoUrl.includes("youtu.be") ? (
+                          <div className="relative aspect-video">
                             <iframe
                               src={design.videoUrl
                                 .replace("watch?v=", "embed/")
@@ -138,19 +139,22 @@ export function CategoryDetailPage() {
                               allow="autoplay; encrypted-media"
                               allowFullScreen
                             />
-                          ) : (
+                          </div>
+                        ) : (
+                          <div className="relative aspect-[9/16]">
                             <video
                               src={design.videoUrl}
                               controls
+                              loop
+                              muted
                               className="w-full h-full object-cover"
-                              poster=""
                             >
                               <track kind="captions" />
                             </video>
-                          )}
-                        </div>
+                          </div>
+                        )
                       ) : (
-                        <div className="aspect-video flex items-center justify-center bg-gradient-to-br from-ivory-dark to-ivory-mid">
+                        <div className="aspect-[9/16] flex items-center justify-center bg-gradient-to-br from-ivory-dark to-ivory-mid">
                           <div className="text-center">
                             <div className="w-14 h-14 rounded-full bg-gold/10 border border-gold/20 flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform">
                               <Play size={20} className="text-gold ml-0.5" />
@@ -174,12 +178,16 @@ export function CategoryDetailPage() {
                         </p>
                       )}
                       <div className="flex items-center justify-between mt-auto pt-4 border-t border-border">
-                        <div className="flex items-center gap-1.5">
-                          <Tag size={13} className="text-gold" />
-                          <span className="font-display text-lg font-semibold text-gold">
-                            {design.price || "Contact for Price"}
-                          </span>
-                        </div>
+                        {getShowPrice(design.id.toString()) ? (
+                          <div className="flex items-center gap-1.5">
+                            <Tag size={13} className="text-gold" />
+                            <span className="font-display text-lg font-semibold text-gold">
+                              {design.price || "Contact for Price"}
+                            </span>
+                          </div>
+                        ) : (
+                          <div />
+                        )}
                         <Link
                           to="/design/$designId/select"
                           params={{ designId: design.id.toString() }}

@@ -1,43 +1,36 @@
 # Eternal Invitation
 
 ## Current State
-The admin authentication uses Internet Identity (ICP decentralized login). The flow is:
-- Admin visits /admin/login
-- Signs in with Internet Identity
-- If first admin, enters a Caffeine platform "admin token" to claim ownership
-- Internet Identity principal is stored as the admin in the authorization module
-
-This has caused confusion because users do not know the admin token, and Internet Identity is unfamiliar.
+- Designs have: id, categoryId, name, description, price (text), videoUrl (text/URL)
+- Admin Designs tab has a "Video URL" text input where admin pastes a YouTube or direct URL
+- Category detail page renders youtube embed or `<video>` tag based on the URL
+- All designs always show price (or "Contact for Price" if empty)
 
 ## Requested Changes (Diff)
 
 ### Add
-- Admin registration (first-time setup): form with email + password fields; registers the admin email and hashed password in the backend
-- Admin login: email + password fields
-- OTP step: after email+password match, backend generates a 6-digit OTP tied to that session; OTP is displayed on-screen (since email sending is a paid feature not enabled on this account) with a note that it simulates what would arrive by email
-- Backend functions: `adminSignup(email, passwordHash)`, `requestAdminOtp(email, passwordHash) -> Text` (returns OTP for display), `verifyAdminOtp(email, otp) -> Bool` (verifies and creates session token), `verifyAdminSession(sessionToken) -> Bool`
-- Session token: backend stores a session token after OTP verification; frontend stores token in localStorage and sends it with admin API calls
-- All admin-protected backend functions must accept a session token instead of (or in addition to) Internet Identity principal check
+- `showPrice: Bool` field to the `Design` type in the backend
+- Video file upload input in the admin Designs tab (upload directly from device/gallery), replacing the YouTube URL text field
+- Uploaded video is stored via the blob-storage component and its hash URL is saved as `videoUrl`
+- Upload progress indicator while the video is uploading
+- Per-design price toggle switch: when OFF, price is hidden on public category pages; when ON, price is visible
+- Admin can assign a design to any category from the category dropdown (already exists — no change needed)
 
 ### Modify
-- AdminLoginPage: Replace Internet Identity flow with email/password/OTP multi-step form
-  - Step 1 "setup": shown if no admin exists yet -- email + password + confirm password fields
-  - Step 1 "login": email + password
-  - Step 2 "otp": 6-digit OTP input with countdown timer (5 minutes)
-  - Step 3 "done": redirect to dashboard
-- AdminDashboard: Replace Internet Identity logout with session-token-based logout (clear localStorage token)
-- All useIsCallerAdmin and Internet Identity hooks in admin pages: replaced with session token checks
-- Backend admin authorization: add parallel email/password auth system alongside existing Internet Identity (keep existing for backward compat, add new email-based admin auth)
+- Backend `Design` type: add `showPrice: Bool` field
+- `createDesignWithSession` and `updateDesignWithSession`: accept `showPrice: Bool` parameter
+- `createDesign` and `updateDesign` (legacy): accept `showPrice: Bool` parameter
+- `backend.d.ts`: reflect new `showPrice` field and updated signatures
+- Admin `DesignsTab`: replace Video URL text field with a file upload button; add showPrice toggle switch
+- `CategoryDetailPage`: only show price block when `design.showPrice === true`
+- `useCreateDesignSession` / `useUpdateDesignSession` hooks: pass `showPrice` through
 
 ### Remove
-- Internet Identity login button from the admin login page
-- Admin token / "Claim Ownership" flow
-- References to useInternetIdentity in admin-specific auth flow
+- Nothing removed (YouTube URL text input replaced by file upload)
 
 ## Implementation Plan
-1. Add backend types and storage: AdminCredentials (email, passwordHash, otpCode, otpExpiry), AdminSession (token, expiry)
-2. Add backend functions: adminSignup, requestAdminOtp, verifyAdminOtp, verifyAdminSession, isAdminSetup
-3. Update frontend AdminLoginPage with 3-step flow: setup/login → OTP → done
-4. Update frontend AdminDashboard to use session token from localStorage instead of Internet Identity
-5. Create useAdminSession hook to replace useIsCallerAdmin for admin pages
-6. Update all admin-gated queries/mutations to pass session token
+1. Update `main.mo`: add `showPrice: Bool` to `Design` type and all create/update functions
+2. Update `backend.d.ts`: reflect new `showPrice` field and updated function signatures
+3. Update `useQueries.ts`: pass `showPrice` through create/update session hooks
+4. Update `DesignsTab.tsx`: add video file upload using StorageClient (blob-storage), progress bar, and showPrice toggle
+5. Update `CategoryDetailPage.tsx`: render price block only when `design.showPrice === true`
