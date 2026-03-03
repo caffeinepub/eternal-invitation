@@ -129,9 +129,6 @@ actor {
   };
 
   public shared ({ caller }) func adminSignup(email : Text, passwordHash : Text) : async Bool {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
-      Runtime.trap("Unauthorized: Only admins can set up admin credentials");
-    };
     switch (adminCredentials) {
       case (?_) { Runtime.trap("Admin already set up") };
       case (null) {

@@ -2,15 +2,16 @@ import { Link, useLocation } from "@tanstack/react-router";
 import { Menu, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useState } from "react";
-import { useInternetIdentity } from "../../hooks/useInternetIdentity";
-import { useIsCallerAdmin } from "../../hooks/useQueries";
+import { useVerifyAdminSession } from "../../hooks/useQueries";
 
 export function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
-  const { identity } = useInternetIdentity();
-  const { data: isAdmin } = useIsCallerAdmin();
+  const { data: isSessionValid, isLoading: checkingSession } =
+    useVerifyAdminSession();
+
+  const isAdminLoggedIn = !checkingSession && isSessionValid === true;
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 40);
@@ -69,7 +70,7 @@ export function Navbar() {
               {link.label}
             </Link>
           ))}
-          {identity && isAdmin ? (
+          {isAdminLoggedIn ? (
             <Link
               to="/admin"
               className="nav-link font-body text-sm tracking-widest uppercase text-gold"
@@ -137,7 +138,7 @@ export function Navbar() {
                   {link.label}
                 </Link>
               ))}
-              {identity && isAdmin ? (
+              {isAdminLoggedIn ? (
                 <Link
                   to="/admin"
                   className="font-body text-sm tracking-widest uppercase py-2 text-gold"

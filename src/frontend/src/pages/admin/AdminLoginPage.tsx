@@ -1,3 +1,4 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { Eye, EyeOff, Loader2, Lock, Mail, ShieldCheck } from "lucide-react";
 import { motion } from "motion/react";
@@ -7,6 +8,7 @@ import {
   useAdminLogin,
   useAdminSignup,
   useIsAdminSetup,
+  useVerifyAdminSession,
 } from "../../hooks/useQueries";
 import { hashPassword } from "../../utils/adminSession";
 
@@ -14,13 +16,23 @@ type Step = "check" | "setup" | "login" | "done";
 
 export function AdminLoginPage() {
   const navigate = useNavigate();
+  const qc = useQueryClient();
 
   const { data: isSetup, isLoading: checkingSetup } = useIsAdminSetup();
+  const { data: isSessionValid, isLoading: checkingSession } =
+    useVerifyAdminSession();
 
   const signupMut = useAdminSignup();
   const loginMut = useAdminLogin();
 
   const [step, setStep] = useState<Step>("check");
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (!checkingSession && isSessionValid === true) {
+      void navigate({ to: "/admin" });
+    }
+  }, [checkingSession, isSessionValid, navigate]);
 
   // Setup form
   const [setupEmail, setSetupEmail] = useState("");
@@ -77,6 +89,7 @@ export function AdminLoginPage() {
         email: setupEmail.trim().toLowerCase(),
         passwordHash: hash,
       });
+      void qc.invalidateQueries({ queryKey: ["adminSession"] });
       setStep("done");
       setTimeout(() => {
         void navigate({ to: "/admin" });
@@ -106,6 +119,7 @@ export function AdminLoginPage() {
         email: loginEmail.trim().toLowerCase(),
         passwordHash: hash,
       });
+      void qc.invalidateQueries({ queryKey: ["adminSession"] });
       toast.success("Access granted! Welcome to your dashboard.");
       setStep("done");
       setTimeout(() => {

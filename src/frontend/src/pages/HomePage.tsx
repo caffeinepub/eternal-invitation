@@ -449,12 +449,23 @@ export function HomePage() {
 
             {/* Occasion tags */}
             <p
-              className="font-body text-xs tracking-wider leading-relaxed"
+              className="font-body text-xs tracking-wider leading-relaxed flex flex-wrap justify-center gap-x-2 gap-y-1"
               style={{ color: "oklch(0.62 0.06 72 / 0.8)" }}
             >
-              Wedding&nbsp;&nbsp;•&nbsp;&nbsp;Save the
-              Date&nbsp;&nbsp;•&nbsp;&nbsp;Engagement&nbsp;&nbsp;•&nbsp;&nbsp;Birthday&nbsp;&nbsp;•&nbsp;&nbsp;Anniversary&nbsp;&nbsp;•&nbsp;&nbsp;Reception&nbsp;&nbsp;•&nbsp;&nbsp;Special
-              Occasions
+              {[
+                "Wedding",
+                "Engagement",
+                "Save the Date",
+                "Birthday",
+                "Anniversary",
+                "Reception",
+                "Special Occasions",
+              ].map((tag, i, arr) => (
+                <span key={tag} className="whitespace-nowrap">
+                  {tag}
+                  {i < arr.length - 1 && <span className="mx-1">•</span>}
+                </span>
+              ))}
             </p>
           </motion.div>
         </motion.div>

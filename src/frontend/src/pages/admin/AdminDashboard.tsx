@@ -1,4 +1,5 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import {
   ClipboardList,
@@ -22,6 +23,7 @@ import { SettingsTab } from "./tabs/SettingsTab";
 
 export function AdminDashboard() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const sessionToken = getAdminSession() ?? "";
   const { data: isValid, isLoading: checkingSession } = useVerifyAdminSession();
   const logoutMut = useAdminLogout();
@@ -42,6 +44,7 @@ export function AdminDashboard() {
       await logoutMut.mutateAsync(sessionToken);
     } finally {
       clearAdminSession();
+      void queryClient.invalidateQueries({ queryKey: ["adminSession"] });
       void navigate({ to: "/" });
     }
   }

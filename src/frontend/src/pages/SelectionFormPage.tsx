@@ -282,23 +282,25 @@ export function SelectionFormPage() {
 
               {/* Event Date */}
               <div>
-                <label
-                  htmlFor="sf-date"
-                  className="flex items-center gap-2 font-body text-xs tracking-widest uppercase text-muted-foreground mb-2"
-                >
-                  <Calendar size={12} className="text-gold" />
-                  Event Date <span className="text-gold">*</span>
-                </label>
-                <input
-                  id="sf-date"
-                  type="date"
-                  value={form.eventDate}
-                  onChange={(e) => setField("eventDate", e.target.value)}
-                  min={new Date().toISOString().split("T")[0]}
-                  className={`w-full px-4 py-3 rounded-sm border font-body text-sm bg-card focus:outline-none focus:ring-2 focus:ring-gold/30 transition ${
-                    errors.eventDate ? "border-destructive" : "border-input"
-                  }`}
-                />
+                <div className="flex items-center gap-3">
+                  <label
+                    htmlFor="sf-date"
+                    className="flex items-center gap-2 font-body text-xs tracking-widest uppercase text-muted-foreground whitespace-nowrap flex-shrink-0"
+                  >
+                    <Calendar size={12} className="text-gold" />
+                    Event Date <span className="text-gold">*</span>
+                  </label>
+                  <input
+                    id="sf-date"
+                    type="date"
+                    value={form.eventDate}
+                    onChange={(e) => setField("eventDate", e.target.value)}
+                    min={new Date().toISOString().split("T")[0]}
+                    className={`flex-1 px-4 py-3 rounded-sm border font-body text-sm bg-card focus:outline-none focus:ring-2 focus:ring-gold/30 transition ${
+                      errors.eventDate ? "border-destructive" : "border-input"
+                    }`}
+                  />
+                </div>
                 {errors.eventDate && (
                   <p className="font-body text-xs text-destructive mt-1">
                     {errors.eventDate}
